@@ -1,6 +1,8 @@
 # Start
 npm init -y
+
 npm install axios cheerio
+
 node server.js
 
 # requierments 
