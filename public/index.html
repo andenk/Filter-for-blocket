@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Car Listings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Sticky Header -->
+<div class="sticky-header"> 
+  <div>
+    <label for="priceSort">Sort by Price:</label>
+    <select id="priceSort" onchange="sortCarsByPrice()">
+      <option value="default">Default</option>
+      <option value="asc">Low to High</option>
+      <option value="desc">High to Low</option>
+    </select>
+  </div>
+  <button class="filter-button" onclick="openFilterModal()">Filter and Sort Options</button>
+</div>
+
+<div class="details-modal" id="carModal">
+  <div class="filter-modal-content">
+    <span class="close-btn" onclick="document.getElementById('carModal').style.display='none'">&times;</span>
+    <h2 id="carHeading"></h2>
+    <p id="carPrice"></p>
+    <p id="carSeller"></p>
+    <p id="carListTime"></p>
+    <p id="carDescription"></p>
+    <div id="carImages" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
+    <a id="carLink" href="#" target="_blank">View Full Listing</a>
+  </div>
+</div>
+
+<!-- Filter Modal -->
+<div class="filter-modal" id="filterModal">
+  <div class="filter-modal-content">
+    <span class="close-btn" onclick="closeFilterModal()">&times;</span>
+    <h2>Filter and Sort Options</h2>
+    <div class="filter-controls">
+      <label>
+        Free Text Search:
+        <input type="text" id="q">
+      </label>
+      <label>
+        Exclude Words (comma-separated):
+        <input type="text" id="excludeWords" placeholder="Enter words to exclude">
+      </label>
+      <label>
+        Gearbox:
+        <select id="gearbox">
+          <option value="">Any</option>
+          <option value="Automat">Automatic</option>
+          <option value="Manuell">Manual</option>
+        </select>
+      </label>
+      <label>
+        Mileage (max km):
+        <input type="number" id="mileage" placeholder="Enter max mileage">
+      </label>
+      <label>
+        Price Range (min-max SEK):
+        <input type="number" id="priceMin" placeholder="Min Price">
+        <input type="number" id="priceMax" placeholder="Max Price">
+      </label>
+      <label>
+        Model Year (min-max):
+        <input type="number" id="yearMin" placeholder="Min Year">
+        <input type="number" id="yearMax" placeholder="Max Year">
+      </label>
+      <label>
+        Fuel Type:
+        <select id="fuel">
+          <option value="">Any</option>
+          <option value="El">Electric</option>
+          <option value="Hybrid">Hybrid</option>
+          <option value="Bensin">Gasoline</option>
+          <option value="Diesel">Diesel</option>
+        </select>
+      </label>
+      <label>
+        Sort Order:
+        <select id="sortOrder">
+          <option value="">Default</option>
+          <option value="Billigast">Cheapest</option>
+          <option value="Senaste">Latest</option>
+        </select>
+      </label>
+      <button onclick="applyFilters()">Apply Filters</button>
+    </div>
+  </div>
+</div>
+
+<!-- Car Listings -->
+<div class="car-list" id="carList"></div>
+
+<script>
+  let carsData = [];
+
+  window.onload = function() {
+    openFilterModal();
+  };
+
+
+
+
+
+  function openFilterModal() {
+    document.getElementById('filterModal').style.display = 'flex';
+  }
+
+  function closeFilterModal() {
+    document.getElementById('filterModal').style.display = 'none';
+  }
+
+  function applyFilters() {
+  const filters = [];
+  const q = document.getElementById('q').value;
+  const gearbox = document.getElementById('gearbox').value;
+  const mileage = document.getElementById('mileage').value;
+  const priceMin = document.getElementById('priceMin').value;
+  const priceMax = document.getElementById('priceMax').value;
+  const yearMin = document.getElementById('yearMin').value;
+  const yearMax = document.getElementById('yearMax').value;
+  const fuel = document.getElementById('fuel').value;
+  const sortOrder = document.getElementById('sortOrder').value;
+  const excludeWordsInput = document.getElementById('excludeWords').value;
+  const excludeWords = excludeWordsInput.split(',').map(word => word.trim().toLowerCase());
+
+  if (gearbox) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "gearbox", values: [gearbox] }))}`);
+  if (mileage) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "milage", range: { end: mileage } }))}`);
+  if (priceMin || priceMax) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "price", range: { start: priceMin, end: priceMax } }))}`);
+  if (yearMin || yearMax) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "modelYear", range: { start: yearMin, end: yearMax } }))}`);
+  if (fuel) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "fuel", values: [fuel] }))}`);
+  if (sortOrder) filters.push(`sortOrder=${sortOrder}`);
+  if (q) filters.push(`q=${encodeURIComponent(q)}`);
+
+  const queryString = filters.length ? `?${filters.join('&')}` : '';
+
+  // Check if excludeWords is empty
+  if (excludeWordsInput.trim() === '') {
+    // Call fetchCars without excludeWords logic
+    fetchCars(queryString);
+  } else {
+    // Call fetchCars with excludeWords filtering
+    fetchCarsWithExclusions(queryString, excludeWords);
+  }
+
+  closeFilterModal();
+}
+
+// remove word is emty
+  async function fetchCars(queryString = '') {
+    try {
+      const response = await fetch(`/api/cars${queryString}`);
+      carsData = await response.json();
+      displayCars(carsData);
+    } catch (error) {
+      console.error('Failed to fetch cars:', error);
+    }
+  }
+  // with removed words
+  async function fetchCarsWithExclusions(queryString = '', excludeWords = []) {
+  try {
+    const response = await fetch(`/api/cars${queryString}`);
+    let carsData = await response.json();
+
+    // Filter out cars containing any of the exclude words
+    carsData = carsData.filter(car => {
+      const carText = (car.heading + ' ' + car.description).toLowerCase();
+      return !excludeWords.some(word => word && carText.includes(word));
+    });
+
+    displayCars(carsData);
+  } catch (error) {
+    console.error('Failed to fetch cars:', error);
+  }
+}
+
+
+  function displayCars(cars) {
+    const carList = document.getElementById('carList');
+    carList.innerHTML = '';
+    cars.forEach((car, index) => {
+      const carItem = document.createElement('div');
+      carItem.classList.add('car-item');
+      carItem.innerHTML = `
+        <img src="${car.thumbnail}" alt="${car.heading}" onclick="showCarDetails(${index})">
+        <h3>${car.heading}</h3>
+        <p>${car.price.amount}</p>
+      `;
+      carList.appendChild(carItem);
+    });
+  }
+
+  function showCarDetails(index) {
+    const car = carsData[index];
+    const modal = document.getElementById('carModal');
+
+    // Populate modal with car details
+    document.getElementById('carHeading').innerText = car.heading;
+    document.getElementById('carPrice').innerText = `Price: ${car.price.amount}`;
+    document.getElementById('carSeller').innerText = `Seller: ${car.seller.type} - ${car.seller.name}`;
+    document.getElementById('carListTime').innerText = `Listed on: ${new Date(car.originalListTime).toLocaleDateString()}`;
+    document.getElementById('carDescription').innerText = car.description;
+    document.getElementById('carLink').href = car.link;
+
+    // Display all images in the modal
+    const carImages = document.getElementById('carImages');
+    carImages.innerHTML = '';
+    car.car.images.forEach(imgUrl => {
+      const img = document.createElement('img');
+      img.src = imgUrl;
+      carImages.appendChild(img);
+    });
+
+    modal.style.display = 'flex';
+  }
+
+  function sortCarsByPrice() {
+    const sortOrder = document.getElementById('priceSort').value;
+    carsData.sort((a, b) => {
+      const priceA = parseInt(a.price.amount.replace(/\D/g, ''));
+      const priceB = parseInt(b.price.amount.replace(/\D/g, ''));
+      if (sortOrder === 'asc') return priceA - priceB;
+      if (sortOrder === 'desc') return priceB - priceA;
+      return 0; // Default
+    });
+    displayCars(carsData);
+  }
+</script>
+
+</body>
+</html>
