@@ -138,7 +138,7 @@
   if (q) filters.push(`q=${encodeURIComponent(q)}`);
 
   const queryString = filters.length ? `?${filters.join('&')}` : '';
-
+console.log(queryString)
   // Check if excludeWords is empty
   if (excludeWordsInput.trim() === '') {
     // Call fetchCars without excludeWords logic
@@ -152,7 +152,7 @@
 }
 
 // remove word is emty
-  async function fetchCars(queryString = '') {
+  async function fetchCars(queryString) {
     try {
       const response = await fetch(`/api/cars${queryString}`);
       carsData = await response.json();
@@ -162,7 +162,7 @@
     }
   }
   // with removed words
-  async function fetchCarsWithExclusions(queryString = '', excludeWords = []) {
+  async function fetchCarsWithExclusions(queryString, excludeWords = []) {
   try {
     const response = await fetch(`/api/cars${queryString}`);
     let carsData = await response.json();
@@ -196,28 +196,45 @@
   }
 
   function showCarDetails(index) {
+    // Check if the car data exists at the given index
+    if (!carsData[index]) {
+        console.error('Car data is undefined at index:', index);
+        alert('Unable to load car details.');
+        return;
+    }
+
     const car = carsData[index];
     const modal = document.getElementById('carModal');
 
-    // Populate modal with car details
-    document.getElementById('carHeading').innerText = car.heading;
-    document.getElementById('carPrice').innerText = `Price: ${car.price.amount}`;
-    document.getElementById('carSeller').innerText = `Seller: ${car.seller.type} - ${car.seller.name}`;
-    document.getElementById('carListTime').innerText = `Listed on: ${new Date(car.originalListTime).toLocaleDateString()}`;
-    document.getElementById('carDescription').innerText = car.description;
-    document.getElementById('carLink').href = car.link;
+    if (!modal) {
+        console.error('Modal element not found');
+        return;
+    }
 
-    // Display all images in the modal
+    // Populate modal with car details
+    document.getElementById('carHeading').innerText = car.heading || 'No title available';
+    document.getElementById('carPrice').innerText = `Price: ${car.price?.amount || 'N/A'}`;
+    document.getElementById('carSeller').innerText = `Seller: ${car.seller?.type || 'N/A'} - ${car.seller?.name || 'Unknown'}`;
+    document.getElementById('carListTime').innerText = `Listed on: ${car.originalListTime ? new Date(car.originalListTime).toLocaleDateString() : 'N/A'}`;
+    document.getElementById('carDescription').innerText = car.description || 'No description available';
+    document.getElementById('carLink').href = car.link || '#';
+
+    // Display all images in the modal, with null check for car.images
     const carImages = document.getElementById('carImages');
-    carImages.innerHTML = '';
-    car.car.images.forEach(imgUrl => {
-      const img = document.createElement('img');
-      img.src = imgUrl;
-      carImages.appendChild(img);
-    });
+    carImages.innerHTML = ''; // Clear any previous images
+    if (Array.isArray(car.images)) {
+        car.images.forEach(imgUrl => {
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            carImages.appendChild(img);
+        });
+    } else {
+        console.warn('No images available for this car.');
+    }
 
     modal.style.display = 'flex';
-  }
+}
+
 
   function sortCarsByPrice() {
     const sortOrder = document.getElementById('priceSort').value;

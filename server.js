@@ -4,20 +4,51 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = 3000;
 
-// Serve static files for the frontend
 app.use(express.static('public'));
 
 app.get('/api/cars', async (req, res) => {
     try {
+        const { q, sortOrder } = req.query;
+        const filters = req.query.filter; // Accept multiple 'filter' query parameters
+
+        // Base URL for Blocket
+        let url = 'https://www.blocket.se/bilar/sok';
+
+        // Initialize an array to collect query parameters
+        const queryParams = [];
+
+        // Handle 'q' (search term) if it exists
+        if (q) queryParams.push(`q=${encodeURIComponent(q)}`);
+
+        // Handle 'filter' (allows multiple filters) if they exist
+        if (filters) {
+            // If `filters` is an array (when multiple filters are sent), map and encode each filter
+            if (Array.isArray(filters)) {
+                filters.forEach(filter => queryParams.push(`filter=${encodeURIComponent(filter)}`));
+            } else {
+                // If only a single filter is sent, encode it directly
+                queryParams.push(`filter=${encodeURIComponent(filters)}`);
+            }
+        }
+
+        // Construct the URL with all query parameters except sortOrder
+        if (queryParams.length > 0) {
+            url += `?${queryParams.join('&')}`;
+        }
+
+        // Append sortOrder at the end if it exists
+        if (sortOrder) {
+            url += (queryParams.length > 0 ? '&' : '?') + `sortOrder=${encodeURIComponent(sortOrder)}`;
+        }
+
+        console.log('Constructed URL:', url);   
+
         // Fetch and parse the Blocket data
-        const response = await axios.get('https://www.blocket.se/bilar/sok?filter=%7B%22key%22%3A%22gearbox%22%2C%22values%22%3A%5B%22Automat%22%5D%7D&filter=%7B%22key%22%3A%22milage%22%2C%22range%22%3A%7B%22start%22%3A%22%22%2C%22end%22%3A%2211000%22%7D%7D&filter=%7B%22key%22%3A%22price%22%2C%22range%22%3A%7B%22start%22%3A%2220000%22%2C%22end%22%3A%22%22%7D%7D&sortOrder=Billigast&filter=%7B%22key%22%3A%22modelYear%22%2C%22range%22%3A%7B%22start%22%3A%222015%22%2C%22end%22%3A%22%22%7D%7D');
-        
-        // Load HTML and parse the __NEXT_DATA__ JSON
+        const response = await axios.get(url);
         const $ = cheerio.load(response.data);
         const nextDataScript = $('#__NEXT_DATA__').html();
         const nextData = JSON.parse(nextDataScript);
 
-        // Extract the cars data
         const cars = nextData.props?.pageProps?.dehydratedState?.queries?.[0]?.state?.data?.cars;
         res.json(cars || []);
     } catch (error) {
