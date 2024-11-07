@@ -103,10 +103,6 @@
     openFilterModal();
   };
 
-
-
-
-
   function openFilterModal() {
     document.getElementById('filterModal').style.display = 'flex';
   }
@@ -116,69 +112,69 @@
   }
 
   function applyFilters() {
-  const filters = [];
-  const q = document.getElementById('q').value;
-  const gearbox = document.getElementById('gearbox').value;
-  const mileage = document.getElementById('mileage').value;
-  const priceMin = document.getElementById('priceMin').value;
-  const priceMax = document.getElementById('priceMax').value;
-  const yearMin = document.getElementById('yearMin').value;
-  const yearMax = document.getElementById('yearMax').value;
-  const fuel = document.getElementById('fuel').value;
-  const sortOrder = document.getElementById('sortOrder').value;
-  const excludeWordsInput = document.getElementById('excludeWords').value;
-  const excludeWords = excludeWordsInput.split(',').map(word => word.trim().toLowerCase());
+    const filters = [];
+    const q = document.getElementById('q').value;
+    const gearbox = document.getElementById('gearbox').value;
+    const mileage = document.getElementById('mileage').value;
+    const priceMin = document.getElementById('priceMin').value;
+    const priceMax = document.getElementById('priceMax').value;
+    const yearMin = document.getElementById('yearMin').value;
+    const yearMax = document.getElementById('yearMax').value;
+    const fuel = document.getElementById('fuel').value;
+    const sortOrder = document.getElementById('sortOrder').value;
+    const excludeWordsInput = document.getElementById('excludeWords').value;
+    const excludeWords = excludeWordsInput.split(',').map(word => word.trim().toLowerCase());
 
-  if (gearbox) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "gearbox", values: [gearbox] }))}`);
-  if (mileage) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "milage", range: { end: mileage } }))}`);
-  if (priceMin || priceMax) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "price", range: { start: priceMin, end: priceMax } }))}`);
-  if (yearMin || yearMax) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "modelYear", range: { start: yearMin, end: yearMax } }))}`);
-  if (fuel) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "fuel", values: [fuel] }))}`);
-  if (sortOrder) filters.push(`sortOrder=${sortOrder}`);
-  if (q) filters.push(`q=${encodeURIComponent(q)}`);
+    if (gearbox) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "gearbox", values: [gearbox] }))}`);
+    if (mileage) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "milage", range: { end: mileage } }))}`);
+    if (priceMin || priceMax) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "price", range: { start: priceMin, end: priceMax } }))}`);
+    if (yearMin || yearMax) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "modelYear", range: { start: yearMin, end: yearMax } }))}`);
+    if (fuel) filters.push(`filter=${encodeURIComponent(JSON.stringify({ key: "fuel", values: [fuel] }))}`);
+    if (sortOrder) filters.push(`sortOrder=${sortOrder}`);
+    if (q) filters.push(`q=${encodeURIComponent(q)}`);
 
-  const queryString = filters.length ? `?${filters.join('&')}` : '';
-console.log(queryString)
-  // Check if excludeWords is empty
-  if (excludeWordsInput.trim() === '') {
-    // Call fetchCars without excludeWords logic
-    fetchCars(queryString);
-  } else {
-    // Call fetchCars with excludeWords filtering
-    fetchCarsWithExclusions(queryString, excludeWords);
+    const queryString = filters.length ? `?${filters.join('&')}` : '';
+    if (excludeWordsInput.trim() === '') {
+      fetchCars(queryString);
+    } else {
+      fetchCarsWithExclusions(queryString, excludeWords);
+    }
+
+    closeFilterModal();
   }
 
-  closeFilterModal();
-}
-
-// remove word is emty
   async function fetchCars(queryString) {
     try {
       const response = await fetch(`/api/cars${queryString}`);
-      carsData = await response.json();
+      const data = await response.json();
+      
+      // Ensure carsData is always an array
+      carsData = Array.isArray(data.cars) ? data.cars : [];
       displayCars(carsData);
     } catch (error) {
       console.error('Failed to fetch cars:', error);
     }
   }
-  // with removed words
+
   async function fetchCarsWithExclusions(queryString, excludeWords = []) {
-  try {
-    const response = await fetch(`/api/cars${queryString}`);
-    let carsData = await response.json();
+    try {
+      const response = await fetch(`/api/cars${queryString}`);
+      const data = await response.json();
 
-    // Filter out cars containing any of the exclude words
-    carsData = carsData.filter(car => {
-      const carText = (car.heading + ' ' + car.description).toLowerCase();
-      return !excludeWords.some(word => word && carText.includes(word));
-    });
+      // Ensure carsData is always an array
+      carsData = Array.isArray(data.cars) ? data.cars : [];
 
-    displayCars(carsData);
-  } catch (error) {
-    console.error('Failed to fetch cars:', error);
+      // Filter out cars containing any of the exclude words
+      carsData = carsData.filter(car => {
+        const carText = (car.heading + ' ' + car.description).toLowerCase();
+        return !excludeWords.some(word => word && carText.includes(word));
+      });
+
+      displayCars(carsData);
+    } catch (error) {
+      console.error('Failed to fetch cars:', error);
+    }
   }
-}
-
 
   function displayCars(cars) {
     const carList = document.getElementById('carList');
@@ -187,16 +183,15 @@ console.log(queryString)
       const carItem = document.createElement('div');
       carItem.classList.add('car-item');
       carItem.innerHTML = `
-        <img src="${car.thumbnail}" alt="${car.heading}" onclick="showCarDetails(${index})">
+        <img src="${car.thumbnail || ''}" alt="${car.heading}" onclick="showCarDetails(${index})">
         <h3>${car.heading}</h3>
-        <p>${car.price.amount}</p>
+        <p>${car.price || 'Price not available'}</p>
       `;
       carList.appendChild(carItem);
     });
   }
 
   function showCarDetails(index) {
-    // Check if the car data exists at the given index
     if (!carsData[index]) {
         console.error('Car data is undefined at index:', index);
         alert('Unable to load car details.');
@@ -206,22 +201,15 @@ console.log(queryString)
     const car = carsData[index];
     const modal = document.getElementById('carModal');
 
-    if (!modal) {
-        console.error('Modal element not found');
-        return;
-    }
-
-    // Populate modal with car details
     document.getElementById('carHeading').innerText = car.heading || 'No title available';
-    document.getElementById('carPrice').innerText = `Price: ${car.price?.amount || 'N/A'}`;
-    document.getElementById('carSeller').innerText = `Seller: ${car.seller?.type || 'N/A'} - ${car.seller?.name || 'Unknown'}`;
-    document.getElementById('carListTime').innerText = `Listed on: ${car.originalListTime ? new Date(car.originalListTime).toLocaleDateString() : 'N/A'}`;
+    document.getElementById('carPrice').innerText = `Price: ${car.price || 'N/A'}`;
+    document.getElementById('carSeller').innerText = `Seller: ${car.sellerType || 'N/A'} - ${car.sellerName || 'Unknown'}`;
+    document.getElementById('carListTime').innerText = `Listed on: ${car.listTime ? new Date(car.listTime).toLocaleDateString() : 'N/A'}`;
     document.getElementById('carDescription').innerText = car.description || 'No description available';
     document.getElementById('carLink').href = car.link || '#';
 
-    // Display all images in the modal, with null check for car.images
     const carImages = document.getElementById('carImages');
-    carImages.innerHTML = ''; // Clear any previous images
+    carImages.innerHTML = '';
     if (Array.isArray(car.images)) {
         car.images.forEach(imgUrl => {
             const img = document.createElement('img');
@@ -233,17 +221,16 @@ console.log(queryString)
     }
 
     modal.style.display = 'flex';
-}
-
+  }
 
   function sortCarsByPrice() {
     const sortOrder = document.getElementById('priceSort').value;
     carsData.sort((a, b) => {
-      const priceA = parseInt(a.price.amount.replace(/\D/g, ''));
-      const priceB = parseInt(b.price.amount.replace(/\D/g, ''));
+      const priceA = parseInt(a.price.replace(/\D/g, '')) || 0;
+      const priceB = parseInt(b.price.replace(/\D/g, '')) || 0;
       if (sortOrder === 'asc') return priceA - priceB;
       if (sortOrder === 'desc') return priceB - priceA;
-      return 0; // Default
+      return 0;
     });
     displayCars(carsData);
   }

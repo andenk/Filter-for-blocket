@@ -1,6 +1,5 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const app = express();
 const PORT = 3000;
 
@@ -9,48 +8,60 @@ app.use(express.static('public'));
 app.get('/api/cars', async (req, res) => {
     try {
         const { q, sortOrder } = req.query;
-        const filters = req.query.filter; // Accept multiple 'filter' query parameters
+        const filters = req.query.filter;
 
-        // Base URL for Blocket
-        let url = 'https://www.blocket.se/bilar/sok';
-
-        // Initialize an array to collect query parameters
+        let url = 'https://api.blocket.se/motor-search-service/v4/search/car';
         const queryParams = [];
 
-        // Handle 'q' (search term) if it exists
         if (q) queryParams.push(`q=${encodeURIComponent(q)}`);
-
-        // Handle 'filter' (allows multiple filters) if they exist
         if (filters) {
-            // If `filters` is an array (when multiple filters are sent), map and encode each filter
             if (Array.isArray(filters)) {
                 filters.forEach(filter => queryParams.push(`filter=${encodeURIComponent(filter)}`));
             } else {
-                // If only a single filter is sent, encode it directly
                 queryParams.push(`filter=${encodeURIComponent(filters)}`);
             }
         }
 
-        // Construct the URL with all query parameters except sortOrder
         if (queryParams.length > 0) {
             url += `?${queryParams.join('&')}`;
         }
-
-        // Append sortOrder at the end if it exists
         if (sortOrder) {
             url += (queryParams.length > 0 ? '&' : '?') + `sortOrder=${encodeURIComponent(sortOrder)}`;
         }
 
-        console.log('Constructed URL:', url);   
+        console.log('Constructed URL:', url);
 
-        // Fetch and parse the Blocket data
         const response = await axios.get(url);
-        const $ = cheerio.load(response.data);
-        const nextDataScript = $('#__NEXT_DATA__').html();
-        const nextData = JSON.parse(nextDataScript);
+        const { cars = [], hits, pages, sortOrder: apiSortOrder, shareUrl } = response.data;
 
-        const cars = nextData.props?.pageProps?.dehydratedState?.queries?.[0]?.state?.data?.cars;
-        res.json(cars || []);
+        const formattedCars = cars && cars.map(car => ({
+            dealId: car.dealId,
+            link: car.link,
+            listTime: car.listTime,
+            sellerType: car.seller.type,
+            sellerName: car.seller.name,
+            sellerId: car.seller.id,
+            heading: car.heading,
+            price: car.price.amount,
+            billingPeriod: car.price.billingPeriod,
+            thumbnail: car.thumbnail,
+            location: car.car.location,
+            fuel: car.car.fuel,
+            gearbox: car.car.gearbox,
+            regDate: car.car.regDate,
+            mileage: car.car.mileage,
+            images: (car.car.images || []).map(img => img.image),
+            equipment: (car.car.equipment || []).map(equip => equip.label),
+            description: car.description
+        })) || [];
+
+        res.json({
+            cars: formattedCars,
+            hits,
+            pages,
+            sortOrder: apiSortOrder,
+            shareUrl
+        });
     } catch (error) {
         console.error('Error fetching cars data:', error.message);
         res.status(500).json({ error: 'Failed to fetch car data' });
